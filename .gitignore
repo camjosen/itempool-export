@@ -1,8 +1,7 @@
 # Ignore folders that contain user data
 /database
 /images
-/user_data
-/zipped_user_data
+/out
 
 # Other
 node_modules

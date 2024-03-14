@@ -1,6 +1,12 @@
 import {Database} from "duckdb-async";
 import {createArrayCsvWriter} from "csv-writer";
-import * as fs from "fs";
+import * as archiver from "archiver";
+import * as fsLegacy from "fs";
+import * as fs from "fs/promises";
+import * as path from "path";
+
+const UNZIPPED_BASE_DIR = process.cwd() + "/out/unzipped/";
+const ZIPPED_BASE_DIR = process.cwd() + "/out/zipped/";
 
 type User = {
   id: string;
@@ -29,24 +35,28 @@ type Item = {
 
 async function main() {
   const db = await Database.create(":memory:");
-  await setup(db);
+  await dbSetup(db);
+  await fs.mkdir(UNZIPPED_BASE_DIR, {recursive: true});
+  await fs.mkdir(ZIPPED_BASE_DIR, {recursive: true});
   const userData = await getUserData(db);
-  // Pick a semi-super-user for testing. Eventually remove slice().
-  const users = userData.slice(66, 67);
-  users.forEach(async (user) => {
-    await makeCSV(db, user);
-  });
+  await Promise.all(
+    userData.map(async (user) => {
+      await makeCSV(db, user);
+    }),
+  );
 }
 
 async function makeCSV(db: Database, user: User): Promise<void> {
   // Create a directory for this user.
-  const dir = "./user_data/" + user.id;
-  fs.mkdir(dir, {recursive: true}, () => {});
+  const unzippedDir = UNZIPPED_BASE_DIR + user.username;
+  await fs.rm(unzippedDir, {recursive: true, force: true});
+  await fs.mkdir(unzippedDir, {recursive: true});
 
   // Get the user's items, and write them to a CSV.
   const items: Item[] = await getItems(db, user.id);
+  const csvFilename = unzippedDir + "/items.csv";
   const item_writer = createArrayCsvWriter({
-    path: dir + "/items.csv",
+    path: csvFilename,
     header: [
       "user_id",
       "context",
@@ -68,16 +78,49 @@ async function makeCSV(db: Database, user: User): Promise<void> {
   );
 
   // Write user metadata to a file
-  fs.writeFile(
-    dir + "/metadata.json",
-    JSON.stringify({...user, email: "", googleEmail: ""}, null, 2),
+  const metadataFilename = unzippedDir + "/metadata.json";
+  await fs.writeFile(
+    metadataFilename,
+    JSON.stringify({...user}, null, 2),
     "utf8",
-    () => {},
   );
+  const fileContent = await fs.readFile(csvFilename, "utf-8");
 
-  // Copy all images into a /images folder for the user.
+  // Regular expression pattern to match URLs
+  const urlPattern =
+    /https:\/\/public\.itempooluserdata\.com\/[a-zA-Z0-9]+\-\d+\.[a-zA-Z]+/g;
+
+  // Extract URLs from the file content
+  const urls = fileContent.match(urlPattern) || [];
+  if (urls.length >= 1) {
+    const srcImgDir = process.cwd() + "/images/";
+    const destImgDir = unzippedDir + "/images/";
+    await fs.mkdir(destImgDir, {recursive: true});
+    await Promise.all(
+      urls.map(async (url) => {
+        const imgFilename = url.substring(36);
+        const sourcFilepath = srcImgDir + imgFilename;
+        const destinationFilepath = destImgDir + imgFilename;
+        await copyFile(sourcFilepath, destinationFilepath);
+      }),
+    );
+  }
 
   // Create a zip folder.
+  const zipPath = process.cwd() + "/out/zipped/" + user.username + ".zip";
+  const output = fsLegacy.createWriteStream(zipPath);
+  const archive = archiver.create("zip", {
+    zlib: {level: 9}, // Compression level
+  });
+  output.on("close", function () {
+    console.log(`SUCCESS ${user.username} — ${archive.pointer()} bytes`);
+  });
+  archive.on("error", function (err) {
+    throw err;
+  });
+  archive.pipe(output);
+  archive.directory(unzippedDir, false);
+  await archive.finalize();
 }
 
 async function getItems(db: Database, userId: string): Promise<Item[]> {
@@ -226,7 +269,16 @@ async function getUserData(db: Database): Promise<User[]> {
   return Object.values(userData);
 }
 
-async function setup(db: Database) {
+async function copyFile(sourceFile: string, destinationFile: string) {
+  try {
+    const data = await fs.readFile(sourceFile);
+    await fs.writeFile(destinationFile, data);
+  } catch (err) {
+    console.error(`Error copying ${sourceFile} to ${destinationFile}`, err);
+  }
+}
+
+async function dbSetup(db: Database) {
   // Creating tables improves the performance of future queries.
   // Also, then we have simple, easy-to-read table names to use in other queries.
   await db.exec(`
