@@ -12,7 +12,6 @@
     "@types/archiver": "^6.0.2",
     "@types/node": "^20.11.27",
     "archiver": "^7.0.1",
-    "csv-writer": "^1.6.0",
     "duckdb-async": "^0.10.0",
     "ts-node": "^10.9.2"
   }

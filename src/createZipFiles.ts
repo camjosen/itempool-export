@@ -1,5 +1,4 @@
 import {Database} from "duckdb-async";
-import {createArrayCsvWriter} from "csv-writer";
 import * as archiver from "archiver";
 import * as fsLegacy from "fs";
 import * as fs from "fs/promises";
@@ -31,6 +30,7 @@ type Item = {
   item_title: string;
   item_doc: string;
   explanation_doc?: string;
+  tags: string[];
 };
 
 async function main() {
@@ -40,7 +40,7 @@ async function main() {
   await fs.mkdir(ZIPPED_BASE_DIR, {recursive: true});
   const userData = await getUserData(db);
   await Promise.all(
-    userData.map(async (user) => {
+    userData.slice(0, 10).map(async (user) => {
       await makeCSV(db, user);
     }),
   );
@@ -54,28 +54,8 @@ async function makeCSV(db: Database, user: User): Promise<void> {
 
   // Get the user's items, and write them to a CSV.
   const items: Item[] = await getItems(db, user.id);
-  const csvFilename = unzippedDir + "/items.csv";
-  const item_writer = createArrayCsvWriter({
-    path: csvFilename,
-    header: [
-      "user_id",
-      "context",
-      "item_id",
-      "item_title",
-      "item_doc",
-      "explanation_doc",
-    ],
-  });
-  item_writer.writeRecords(
-    items.map((i) => [
-      i.user_id,
-      i.context,
-      i.item_id,
-      i.item_title,
-      i.item_doc,
-      i.explanation_doc ?? "",
-    ]),
-  );
+  const jsonFilename = unzippedDir + "/items.json";
+  await fs.writeFile(jsonFilename, JSON.stringify(items), "utf8");
 
   // Write user metadata to a file
   const metadataFilename = unzippedDir + "/metadata.json";
@@ -84,11 +64,11 @@ async function makeCSV(db: Database, user: User): Promise<void> {
     JSON.stringify({...user}, null, 2),
     "utf8",
   );
-  const fileContent = await fs.readFile(csvFilename, "utf-8");
+  const fileContent = await fs.readFile(jsonFilename, "utf-8");
 
   // Regular expression pattern to match URLs
   const urlPattern =
-    /https:\/\/public\.itempooluserdata\.com\/[a-zA-Z0-9]+\-\d+\.[a-zA-Z]+/g;
+    /https:\/\/public\.itempooluserdata\.com\/[a-zA-Z0-9_-]+\-\d+\.[a-zA-Z]+/g;
 
   // Extract URLs from the file content
   const urls = fileContent.match(urlPattern) || [];
@@ -135,6 +115,15 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
     JOIN challenge c ON u.id = c.ownerId
     JOIN challenge_item ci ON c.id = ci.challengeId
     JOIN item_revision ir ON ci.itemRevisionId = ir.id
+    JOIN (
+      SELECT
+        ir.id,
+        list(it.normalizedName) as tags
+      FROM item_revision ir
+      LEFT JOIN item_tag_mapping itm ON ir.id = itm.itemRevisionId
+      LEFT JOIN item_tag it ON itm.itemTagId = it.id
+      GROUP BY ir.id
+    ) irt ON irt.id = ir.id
   `);
   const challengeItems: Item[] = challengeItemsRaw.map((i) => ({
     user_id: userId,
@@ -143,6 +132,7 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
     item_title: i.title,
     item_doc: i.itemDoc,
     explanation_doc: i.explanationDoc ?? undefined,
+    tags: [],
   }));
   const poolItemsRaw = await db.all(`
     SELECT
@@ -153,8 +143,17 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
       ir.explanationDoc
     FROM (SELECT * FROM user u WHERE id = '${userId}') u
     JOIN pool p ON u.id = p.ownerId
-    JOIN item i ON p.id = i.poolId
-    JOIN item_revision ir ON ir.draftItemId = i.id
+    JOIN item ON p.id = item.poolId
+    JOIN item_revision ir ON ir.draftItemId = item.id
+    JOIN (
+      SELECT
+        ir.id,
+        list(it.normalizedName) as tags
+      FROM item_revision ir
+      LEFT JOIN item_tag_mapping itm ON ir.id = itm.itemRevisionId
+      LEFT JOIN item_tag it ON itm.itemTagId = it.id
+      GROUP BY ir.id
+    ) irt ON irt.id = ir.id
   `);
   const poolItems: Item[] = poolItemsRaw.map((i) => ({
     user_id: userId,
@@ -163,6 +162,7 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
     item_title: i.title,
     item_doc: i.itemDoc,
     explanation_doc: i.explanationDoc ?? undefined,
+    tags: [],
   }));
   return [...challengeItems, ...poolItems];
 }
@@ -294,6 +294,8 @@ async function dbSetup(db: Database) {
       CREATE OR REPLACE TABLE item AS SELECT * FROM read_parquet('database/parquet/itempool/public.item/1/*.parquet');
       CREATE OR REPLACE TABLE pool AS SELECT * FROM read_parquet('database/parquet/itempool/public.pool/1/*.parquet');
       CREATE OR REPLACE TABLE item_revision AS SELECT * FROM read_parquet('database/parquet/itempool/public.item_revision/1/*.parquet');
+      CREATE OR REPLACE TABLE item_tag AS SELECT * FROM read_parquet('database/parquet/itempool/public.item_tag/1/*.parquet');
+      CREATE OR REPLACE TABLE item_tag_mapping AS SELECT * FROM read_parquet('database/parquet/itempool/public.item_tag_mapping/1/*.parquet');
   `);
 }
 
