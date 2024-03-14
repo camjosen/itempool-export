@@ -31,27 +31,11 @@ async function main() {
   const db = await Database.create(":memory:");
   await setup(db);
   const userData = await getUserData(db);
-
-  userData.slice(66, 67).forEach(async (user) => {
+  // Pick a semi-super-user for testing. Eventually remove slice().
+  const users = userData.slice(66, 67);
+  users.forEach(async (user) => {
     await makeCSV(db, user);
   });
-
-  // userData.forEach(u => {
-  //   if(u.email != null && u.googleEmail != null) {
-  //     if(u.email != u.googleEmail) {
-  //       console.log(u.email + " : " + u.googleEmail);
-  //     }
-  //   }
-  // })
-
-  // for(const creatorId of creatorIds) {
-  //   await
-  // }
-  // const rows = await db.all(`
-  //   SELECT * FROM challenge_item WHERE createdAt > '2023-10-01'
-  //   LIMIT 10;
-  // `)
-  // console.log(rows);
 }
 
 async function makeCSV(db: Database, user: User): Promise<void> {
@@ -85,7 +69,7 @@ async function makeCSV(db: Database, user: User): Promise<void> {
 
   // Write user metadata to a file
   fs.writeFile(
-    dir + "/user_summary.json",
+    dir + "/metadata.json",
     JSON.stringify({...user, email: "", googleEmail: ""}, null, 2),
     "utf8",
     () => {},
@@ -117,38 +101,26 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
     item_doc: i.itemDoc,
     explanation_doc: i.explanationDoc ?? undefined,
   }));
-  // const poolItemsRaw = await db.all(`
-  //   SELECT
-  //     c.title as context,
-  //     ir.id,
-  //     ir.title,
-  //     ir.itemDoc,
-  //     ir.explanationDoc
-  //   FROM (SELECT * FROM user u WHERE id = '${userId}') u
-  //   JOIN pool p ON u.id = p.ownerId
-  //   JOIN item i ON p.id = i.poolId
-  //   JOIN item_revision ir ON ci.itemRevisionId = ir.id
-  // `);
   const poolItemsRaw = await db.all(`
     SELECT
-      i.id,
-      COUNT(*) as num_revisions
-    FROM item i
-    JOIN item_revision ir ON i.id = ir.draftItemId
-    GROUP BY i.id
-    ORDER BY num_revisions DESC
-    LIMIT 10
+      p.title as context,
+      ir.id,
+      ir.title,
+      ir.itemDoc,
+      ir.explanationDoc
+    FROM (SELECT * FROM user u WHERE id = '${userId}') u
+    JOIN pool p ON u.id = p.ownerId
+    JOIN item i ON p.id = i.poolId
+    JOIN item_revision ir ON ir.draftItemId = i.id
   `);
-  console.log(poolItemsRaw);
-  const poolItems: Item[] = [];
-  // const poolItems: Item[] =  poolItemsRaw.map(i => ({
-  //   user_id: userId,
-  //   context: i.context,
-  //   item_id: i.id,
-  //   item_title: i.title,
-  //   item_doc: i.itemDoc,
-  //   explanation_doc: i.explanationDoc ?? undefined,
-  // }));
+  const poolItems: Item[] = poolItemsRaw.map((i) => ({
+    user_id: userId,
+    context: i.context,
+    item_id: i.id,
+    item_title: i.title,
+    item_doc: i.itemDoc,
+    explanation_doc: i.explanationDoc ?? undefined,
+  }));
   return [...challengeItems, ...poolItems];
 }
 
@@ -216,49 +188,47 @@ async function getUserData(db: Database): Promise<User[]> {
       recentItemCount: 0,
     };
   });
-  // const recentItemsQueryResult = await db.all(`
-  //   SELECT
-  //     u.id,
-  //     p.pool_items,
-  //     c.challenge_items,
-  //     COALESCE(p.pool_items, 0) + COALESCE(c.challenge_items, 0) AS num_items
-  //   FROM user u
-  //   LEFT JOIN (
-  //     SELECT ownerId, COUNT(*) as pool_items
-  //     FROM pool p
-  //     JOIN (
-  //       SELECT * FROM item WHERE createdAt > '2023-10-01'
-  //     ) i ON i."poolId" = p.id
-  //     GROUP BY ownerId
-  //   ) p ON u.id = p.ownerId
-  //   LEFT JOIN (
-  //     SELECT
-  //       ch.ownerId,
-  //       COUNT(*) as challenge_items
-  //     FROM challenge ch
-  //     JOIN (
-  //       SELECT * FROM challenge_item WHERE createdAt > '2023-10-01'
-  //     ) ci ON ci."challengeId" = ch.id
-  //     GROUP BY ownerId
-  //   ) c ON u.id = c.ownerId
-  //   WHERE
-  //     num_items >= 1
-  //   ORDER BY
-  //       num_items ASC
-  // `);
-  // console.log(recentItemsQueryResult.slice(0, 10));
-  // recentItemsQueryResult.forEach(row => {
-  //   if(userData[row.id] != null) {
-  //     userData[row.id].recentItemCount = Number(row.num_items ?? 0);
-  //   }
-  // });
+  const recentItemsQueryResult = await db.all(`
+    SELECT
+      u.id,
+      p.pool_items,
+      c.challenge_items,
+      COALESCE(p.pool_items, 0) + COALESCE(c.challenge_items, 0) AS num_items
+    FROM user u
+    LEFT JOIN (
+      SELECT ownerId, COUNT(*) as pool_items
+      FROM pool p
+      JOIN (
+        SELECT * FROM item WHERE createdAt > '2023-10-01'
+      ) i ON i."poolId" = p.id
+      GROUP BY ownerId
+    ) p ON u.id = p.ownerId
+    LEFT JOIN (
+      SELECT
+        ch.ownerId,
+        COUNT(*) as challenge_items
+      FROM challenge ch
+      JOIN (
+        SELECT * FROM challenge_item WHERE createdAt > '2023-10-01'
+      ) ci ON ci."challengeId" = ch.id
+      GROUP BY ownerId
+    ) c ON u.id = c.ownerId
+    WHERE
+      num_items >= 1
+    ORDER BY
+        num_items ASC
+  `);
+  recentItemsQueryResult.forEach((row) => {
+    if (userData[row.id] != null) {
+      userData[row.id].recentItemCount = Number(row.num_items ?? 0);
+    }
+  });
   return Object.values(userData);
 }
 
-/**
- *
- */
 async function setup(db: Database) {
+  // Creating tables improves the performance of future queries.
+  // Also, then we have simple, easy-to-read table names to use in other queries.
   await db.exec(`
       CREATE OR REPLACE TABLE challenge AS SELECT * FROM read_parquet('database/parquet/itempool/public.challenge/1/*.parquet');
       CREATE OR REPLACE TABLE challenge_attempt AS SELECT * FROM read_parquet('database/parquet/itempool/public.challenge_attempt/1/*.parquet');
