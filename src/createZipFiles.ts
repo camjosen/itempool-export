@@ -2,7 +2,6 @@ import {Database} from "duckdb-async";
 import * as archiver from "archiver";
 import * as fsLegacy from "fs";
 import * as fs from "fs/promises";
-import * as path from "path";
 
 const UNZIPPED_BASE_DIR = process.cwd() + "/out/unzipped/";
 const ZIPPED_BASE_DIR = process.cwd() + "/out/zipped/";
@@ -40,7 +39,7 @@ async function main() {
   await fs.mkdir(ZIPPED_BASE_DIR, {recursive: true});
   const userData = await getUserData(db);
   await Promise.all(
-    userData.slice(0, 10).map(async (user) => {
+    userData.map(async (user) => {
       await makeCSV(db, user);
     }),
   );
@@ -110,18 +109,19 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
       ir.id,
       ir.title,
       ir.itemDoc,
-      ir.explanationDoc
+      ir.explanationDoc,
+      irt.tags
     FROM (SELECT * FROM user u WHERE id = '${userId}') u
     JOIN challenge c ON u.id = c.ownerId
     JOIN challenge_item ci ON c.id = ci.challengeId
     JOIN item_revision ir ON ci.itemRevisionId = ir.id
-    JOIN (
+    LEFT JOIN (
       SELECT
         ir.id,
         list(it.normalizedName) as tags
       FROM item_revision ir
-      LEFT JOIN item_tag_mapping itm ON ir.id = itm.itemRevisionId
-      LEFT JOIN item_tag it ON itm.itemTagId = it.id
+      JOIN item_tag_mapping itm ON ir.id = itm.itemRevisionId
+      JOIN item_tag it ON itm.itemTagId = it.id
       GROUP BY ir.id
     ) irt ON irt.id = ir.id
   `);
@@ -132,7 +132,7 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
     item_title: i.title,
     item_doc: i.itemDoc,
     explanation_doc: i.explanationDoc ?? undefined,
-    tags: [],
+    tags: i.tags,
   }));
   const poolItemsRaw = await db.all(`
     SELECT
@@ -140,18 +140,19 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
       ir.id,
       ir.title,
       ir.itemDoc,
-      ir.explanationDoc
+      ir.explanationDoc,
+      irt.tags
     FROM (SELECT * FROM user u WHERE id = '${userId}') u
     JOIN pool p ON u.id = p.ownerId
     JOIN item ON p.id = item.poolId
     JOIN item_revision ir ON ir.draftItemId = item.id
-    JOIN (
+    LEFT JOIN (
       SELECT
         ir.id,
         list(it.normalizedName) as tags
       FROM item_revision ir
-      LEFT JOIN item_tag_mapping itm ON ir.id = itm.itemRevisionId
-      LEFT JOIN item_tag it ON itm.itemTagId = it.id
+      JOIN item_tag_mapping itm ON ir.id = itm.itemRevisionId
+      JOIN item_tag it ON itm.itemTagId = it.id
       GROUP BY ir.id
     ) irt ON irt.id = ir.id
   `);
@@ -162,7 +163,7 @@ async function getItems(db: Database, userId: string): Promise<Item[]> {
     item_title: i.title,
     item_doc: i.itemDoc,
     explanation_doc: i.explanationDoc ?? undefined,
-    tags: [],
+    tags: i.tags,
   }));
   return [...challengeItems, ...poolItems];
 }
@@ -300,3 +301,21 @@ async function dbSetup(db: Database) {
 }
 
 main();
+
+// async function test() {
+//   const db = await Database.create(":memory:");
+//   dbSetup(db);
+//   const res = await db.all(`
+//     select
+//       p.id,
+//       list(t.normalizedName) as tags
+//     from
+//       pool p
+//       join item_tag t ON p.id = t.poolId
+//     group by p.id
+//     limit
+//       10;
+//     `);
+//   console.log(res);
+// }
+// test();
