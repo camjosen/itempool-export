@@ -283,20 +283,20 @@ async function dbSetup(db: Database) {
   // Creating tables improves the performance of future queries.
   // Also, then we have simple, easy-to-read table names to use in other queries.
   await db.exec(`
-      CREATE OR REPLACE TABLE challenge AS SELECT * FROM read_parquet('database/parquet/itempool/public.challenge/1/*.parquet');
-      CREATE OR REPLACE TABLE challenge_attempt AS SELECT * FROM read_parquet('database/parquet/itempool/public.challenge_attempt/1/*.parquet');
-      CREATE OR REPLACE TABLE challenge_item_attempt AS SELECT * FROM read_parquet('database/parquet/itempool/public.challenge_item_attempt/1/*.parquet');
-      CREATE OR REPLACE TABLE live_session AS SELECT * FROM read_parquet('database/parquet/itempool/public.live_session/1/*.parquet');
-      CREATE OR REPLACE TABLE live_challenge AS SELECT * FROM read_parquet('database/parquet/itempool/public.live_challenge/1/*.parquet');
-      CREATE OR REPLACE TABLE user AS SELECT * FROM read_parquet('database/parquet/itempool/public.user/1/*.parquet');
-      CREATE OR REPLACE TABLE item_attempt AS SELECT * FROM read_parquet('database/parquet/itempool/public.item_attempt/1/*.parquet');
-      CREATE OR REPLACE TABLE challenge_list AS SELECT * FROM read_parquet('database/parquet/itempool/public.challenge_list/1/*.parquet');
-      CREATE OR REPLACE TABLE challenge_item AS SELECT * FROM read_parquet('database/parquet/itempool/public.challenge_item/1/*.parquet');
-      CREATE OR REPLACE TABLE item AS SELECT * FROM read_parquet('database/parquet/itempool/public.item/1/*.parquet');
-      CREATE OR REPLACE TABLE pool AS SELECT * FROM read_parquet('database/parquet/itempool/public.pool/1/*.parquet');
-      CREATE OR REPLACE TABLE item_revision AS SELECT * FROM read_parquet('database/parquet/itempool/public.item_revision/1/*.parquet');
-      CREATE OR REPLACE TABLE item_tag AS SELECT * FROM read_parquet('database/parquet/itempool/public.item_tag/1/*.parquet');
-      CREATE OR REPLACE TABLE item_tag_mapping AS SELECT * FROM read_parquet('database/parquet/itempool/public.item_tag_mapping/1/*.parquet');
+      CREATE OR REPLACE TABLE challenge AS SELECT * FROM read_parquet('database/itempool/public.challenge/1/*.parquet');
+      CREATE OR REPLACE TABLE challenge_attempt AS SELECT * FROM read_parquet('database/itempool/public.challenge_attempt/1/*.parquet');
+      CREATE OR REPLACE TABLE challenge_item_attempt AS SELECT * FROM read_parquet('database/itempool/public.challenge_item_attempt/1/*.parquet');
+      CREATE OR REPLACE TABLE live_session AS SELECT * FROM read_parquet('database/itempool/public.live_session/1/*.parquet');
+      CREATE OR REPLACE TABLE live_challenge AS SELECT * FROM read_parquet('database/itempool/public.live_challenge/1/*.parquet');
+      CREATE OR REPLACE TABLE user AS SELECT * FROM read_parquet('database/itempool/public.user/1/*.parquet');
+      CREATE OR REPLACE TABLE item_attempt AS SELECT * FROM read_parquet('database/itempool/public.item_attempt/1/*.parquet');
+      CREATE OR REPLACE TABLE challenge_list AS SELECT * FROM read_parquet('database/itempool/public.challenge_list/1/*.parquet');
+      CREATE OR REPLACE TABLE challenge_item AS SELECT * FROM read_parquet('database/itempool/public.challenge_item/1/*.parquet');
+      CREATE OR REPLACE TABLE item AS SELECT * FROM read_parquet('database/itempool/public.item/1/*.parquet');
+      CREATE OR REPLACE TABLE pool AS SELECT * FROM read_parquet('database/itempool/public.pool/1/*.parquet');
+      CREATE OR REPLACE TABLE item_revision AS SELECT * FROM read_parquet('database/itempool/public.item_revision/1/*.parquet');
+      CREATE OR REPLACE TABLE item_tag AS SELECT * FROM read_parquet('database/itempool/public.item_tag/1/*.parquet');
+      CREATE OR REPLACE TABLE item_tag_mapping AS SELECT * FROM read_parquet('database/itempool/public.item_tag_mapping/1/*.parquet');
   `);
 }
 

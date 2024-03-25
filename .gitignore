@@ -1,9 +1,9 @@
 # Ignore folders that contain user data
-/database
-/images
-/out
+**/database
+**/images
+**/out
 
 # Other
 node_modules
 *duck.db*
-/build
+**/build

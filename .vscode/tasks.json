@@ -6,16 +6,22 @@
       "label": "docker-build",
       "platform": "node",
       "dockerBuild": {
-        "dockerfile": "${workspaceFolder}/Dockerfile",
-        "context": "${workspaceFolder}",
+        "dockerfile": "${workspaceFolder}/export/Dockerfile",
+        "context": "${workspaceFolder}/export",
         "pull": true
+      },
+      "node": {
+        "package": "${workspaceFolder}/export/package.json"
       }
     },
     {
       "type": "docker-run",
       "label": "docker-run: release",
       "dependsOn": ["docker-build"],
-      "platform": "node"
+      "platform": "node",
+      "node": {
+        "package": "${workspaceFolder}/export/package.json"
+      }
     },
     {
       "type": "docker-run",
@@ -28,6 +34,7 @@
         }
       },
       "node": {
+        "package": "${workspaceFolder}/export/package.json",
         "enableDebugging": true
       }
     }

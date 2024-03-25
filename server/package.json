@@ -1,0 +1,20 @@
+{
+  "name": "itempool-export",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "tsc",
+    "start": "node ./build/server.js",
+    "docker-push": "docker push us-central1-docker.pkg.dev/cschrist/itempool/itempool-export:latest",
+    "docker-build": "npm run build ; docker build -t us-central1-docker.pkg.dev/cschrist/itempool/itempool-export:latest .",
+    "dev": "nodemon ./server.ts"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.27",
+    "nodemon": "^3.1.0"
+  },
+  "dependencies": {
+    "express": "^4.19.1"
+  }
+}

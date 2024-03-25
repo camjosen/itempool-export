@@ -4,13 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "docker-build": "docker build -t itempool-export .",
-    "docker": "docker run -p 3000:3000 itempool-export",
-    "start": "node ./build/server.js",
-    "build": "tsc",
-    "dev": "nodemon ./src/server.ts",
-    "zip": "ts-node ./src/createZipFiles.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "zip": "ts-node ./src/createZipFiles.ts"
   },
   "author": "camjosen",
   "devDependencies": {
@@ -22,7 +16,5 @@
     "nodemon": "^3.1.0",
     "ts-node": "^10.9.2"
   },
-  "dependencies": {
-    "express": "^4.19.1"
-  }
+  "dependencies": {}
 }

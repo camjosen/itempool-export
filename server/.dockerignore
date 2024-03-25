@@ -22,10 +22,4 @@
 **/values.dev.yaml
 LICENSE
 README.md
-**/database
-**/images
-**/out
-**/src
-**/tsconfig.json
-**/*.duck.db
-**/*.duck.db.wal
+**/build

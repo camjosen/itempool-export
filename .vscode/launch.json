@@ -5,7 +5,11 @@
       "type": "docker",
       "request": "launch",
       "preLaunchTask": "docker-run: debug",
-      "platform": "node"
+      "platform": "node",
+      "node": {
+        "package": "${workspaceFolder}/export/package.json",
+        "localRoot": "${workspaceFolder}/export"
+      }
     }
   ]
 }
